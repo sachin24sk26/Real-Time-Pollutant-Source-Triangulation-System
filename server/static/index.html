@@ -1,0 +1,2262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pollutant Source Triangulation | Real-Time Dashboard</title>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, Monaco, monospace;
+
+    /* Light Theme Palette */
+    --bg-page: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-subtle: #f8fafc;
+    --bg-glass: rgba(255, 255, 255, 0.85);
+    --border-color: #e2e8f0;
+    --border-subtle: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+
+    /* Semantic accents */
+    --teal: #0d9488;
+    --teal-glow: rgba(13, 148, 136, 0.2);
+    --blue: #2563eb;
+    --blue-glow: rgba(37, 99, 235, 0.2);
+    --amber: #d97706;
+    --amber-glow: rgba(217, 119, 6, 0.2);
+    --rose: #e11d48;
+    --rose-glow: rgba(225, 29, 72, 0.2);
+    --purple: #7c3aed;
+    --purple-glow: rgba(124, 58, 237, 0.2);
+    --emerald: #059669;
+    --emerald-glow: rgba(5, 150, 105, 0.2);
+
+    /* Canvas specific */
+    --canvas-bg: #f8fafc;
+    --canvas-grid: #e2e8f0;
+    --canvas-grid-text: #94a3b8;
+    --canvas-node: #1e293b;
+    --canvas-triangle: #94a3b8;
+
+    --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --card-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+    --radius-card: 16px;
+    --radius-btn: 10px;
+    --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  [data-theme="dark"] {
+    --bg-page: #090d16;
+    --bg-card: #111827;
+    --bg-card-subtle: #172033;
+    --bg-glass: rgba(17, 24, 39, 0.88);
+    --border-color: #1e293b;
+    --border-subtle: #172236;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --teal: #14b8a6;
+    --teal-glow: rgba(20, 184, 166, 0.25);
+    --blue: #3b82f6;
+    --blue-glow: rgba(59, 130, 246, 0.25);
+    --amber: #f59e0b;
+    --amber-glow: rgba(245, 158, 11, 0.25);
+    --rose: #f43f5e;
+    --rose-glow: rgba(244, 63, 94, 0.25);
+    --purple: #a855f7;
+    --purple-glow: rgba(168, 85, 247, 0.25);
+    --emerald: #10b981;
+    --emerald-glow: rgba(16, 185, 129, 0.25);
+
+    --canvas-bg: #0c121e;
+    --canvas-grid: #1e293b;
+    --canvas-grid-text: #475569;
+    --canvas-node: #f8fafc;
+    --canvas-triangle: #334155;
+
+    --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -2px rgba(0,0,0,0.3);
+    --card-shadow-lg: 0 10px 20px -3px rgba(0,0,0,0.6), 0 4px 6px -4px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-main);
+    background: var(--bg-page);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
+  }
+
+  /* Header Navigation */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: var(--bg-glass);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+    height: 64px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  [data-theme="dark"] header {
+    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #0d9488 0%, #2563eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    box-shadow: 0 4px 14px var(--teal-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .logo-icon:hover {
+    transform: scale(1.04);
+  }
+  .header-title {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-title h1 {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1.2;
+    margin: 0;
+  }
+  .brand-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--teal-glow);
+    color: var(--teal);
+    border: 1px solid rgba(13, 148, 136, 0.3);
+  }
+  .header-title .tagline {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .nav-separator {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    flex-shrink: 0;
+  }
+
+  /* High-Tech Status Pill */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+  }
+  .pulse-dot-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    height: 10px;
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    position: relative;
+    z-index: 1;
+  }
+  .pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+    animation: radar-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  @keyframes radar-ping {
+    75%, 100% {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+
+  .status-badge.online {
+    background: var(--emerald-glow);
+    color: var(--emerald);
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+  .status-badge.warning {
+    background: var(--amber-glow);
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.35);
+  }
+  .status-badge.danger {
+    background: var(--rose-glow);
+    color: var(--rose);
+    border-color: rgba(244, 63, 94, 0.4);
+    box-shadow: 0 0 16px rgba(244, 63, 94, 0.25);
+  }
+  .status-badge.offline {
+    background: rgba(100, 116, 139, 0.12);
+    color: var(--text-muted);
+    border-color: rgba(100, 116, 139, 0.25);
+  }
+
+  /* Header Right Actions */
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  /* Ping / Telemetry Latency Badge */
+  .ping-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .ping-indicator {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--emerald);
+    box-shadow: 0 0 8px var(--emerald-glow);
+    animation: subtle-pulse 2s infinite;
+  }
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
+
+  /* Speed / Smoothing Segmented Control */
+  .speed-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .speed-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 5px 10px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .speed-btn .speed-sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    opacity: 0.75;
+  }
+  .speed-btn:hover {
+    color: var(--text-primary);
+    background: rgba(148, 163, 184, 0.12);
+  }
+  .speed-btn.active {
+    background: var(--bg-card);
+    color: var(--teal);
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    border-color: var(--border-color);
+  }
+  [data-theme="dark"] .speed-btn.active {
+    background: rgba(20, 184, 166, 0.15);
+    color: #2dd4bf;
+    border-color: rgba(20, 184, 166, 0.4);
+    box-shadow: 0 0 10px rgba(20, 184, 166, 0.2);
+  }
+
+  /* Action Buttons Group */
+  .action-btn-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .icon-btn {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    user-select: none;
+  }
+  .icon-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  }
+  .icon-btn:active {
+    transform: translateY(0);
+  }
+  .icon-btn.active {
+    color: var(--teal);
+    border-color: rgba(13, 148, 136, 0.4);
+    background: var(--teal-glow);
+  }
+  .icon-btn.muted {
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: var(--amber-glow);
+  }
+  .theme-toggle-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .theme-toggle-btn:hover #theme-icon {
+    transform: rotate(20deg) scale(1.1);
+  }
+  #theme-icon {
+    display: inline-block;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Responsive Navbar */
+  @media (max-width: 1360px) {
+    .header-title .tagline { display: none; }
+    .speed-btn .speed-sub { display: none; }
+  }
+  @media (max-width: 1200px) {
+    .brand-badge { display: none; }
+    .speed-btn .speed-label { display: none; }
+    .speed-btn { padding: 5px 8px; }
+    #sound-label, #trail-label { display: none; }
+    .icon-btn { width: 34px; height: 34px; padding: 0; justify-content: center; }
+    .nav-separator { display: none; }
+  }
+  @media (max-width: 820px) {
+    header {
+      height: auto;
+      padding: 10px 16px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .header-left {
+      justify-content: space-between;
+      width: 100%;
+    }
+    .header-actions {
+      width: 100%;
+      justify-content: space-between;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+  }
+
+  /* Main Container */
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 20px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Top Alert Banner / Easy-to-understand status */
+  .overview-banner {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 20px 24px;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .overview-banner::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: var(--emerald);
+    transition: background 0.3s ease;
+  }
+  .overview-banner.status-hazard::before { background: var(--rose); }
+  .overview-banner.status-warn::before { background: var(--amber); }
+
+  .banner-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .banner-heading {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .banner-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Responsive Detail Grid for Banner Boxes */
+  .overview-detail-grid {
+    display: grid;
+    grid-template-columns: 175px 1.2fr 1.2fr minmax(140px, auto);
+    gap: 16px;
+    align-items: stretch;
+  }
+  .banner-box {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  .banner-quick-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 130px;
+    justify-content: space-between;
+  }
+
+  .q-metric-item {
+    min-width: 0;
+  }
+  .q-metric-item .q-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .q-metric-item .q-val {
+    font-size: 17px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .q-metric-item .q-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 1240px) {
+    .overview-detail-grid {
+      grid-template-columns: 160px 1fr 1fr;
+    }
+    .banner-quick-metrics {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      justify-content: space-around;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px 18px;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .overview-detail-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    #threat-gauge {
+      grid-column: 1;
+    }
+    #gas-info-box {
+      grid-column: 2;
+    }
+    #action-box-banner {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .overview-banner {
+      padding: 16px;
+    }
+    .overview-detail-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    #threat-gauge, #gas-info-box, #action-box-banner {
+      grid-column: 1;
+    }
+    .banner-quick-metrics {
+      grid-column: 1;
+      flex-direction: column;
+      gap: 12px;
+    }
+  }
+
+  /* Grid layout for Dashboard core */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 1040px) {
+    .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    position: relative;
+    min-width: 0;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .card-header .map-overlay-controls {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* Canvas Map styling */
+  .canvas-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background: var(--canvas-bg);
+    cursor: crosshair;
+  }
+  canvas#map {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 640 / 500;
+  }
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .map-mini-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: var(--transition);
+  }
+  .map-mini-btn:hover {
+    background: var(--bg-card-subtle);
+    color: var(--text-primary);
+  }
+  .map-mini-btn.active {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+
+  .map-tooltip {
+    position: absolute;
+    display: none;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.92);
+    color: #fff;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    padding: 6px 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 20;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* Map Legend */
+  .map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .legend-symbol {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .legend-symbol.circle { border-radius: 50%; }
+  .legend-symbol.ring { border: 2px solid var(--rose); background: transparent; }
+
+  /* Node Live Cards in right column */
+  .nodes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .node-card {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    position: relative;
+    transition: var(--transition);
+  }
+  .node-card:hover {
+    border-color: var(--teal);
+    transform: translateY(-2px);
+  }
+  .node-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .node-badge {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .node-pos {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+  .node-signal-val {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+  }
+  .node-signal-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 2px;
+    font-weight: 500;
+  }
+  .node-meta {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Estimation Table */
+  .modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+  .modern-table th {
+    background: var(--bg-card-subtle);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+  }
+  .modern-table th:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+  .modern-table th:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+  .modern-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+  }
+  .modern-table tr:last-child td { border-bottom: none; }
+  .modern-table tr.highlight-final {
+    background: rgba(244, 63, 94, 0.05);
+    font-weight: 600;
+  }
+  .coord-pill {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    background: var(--bg-card-subtle);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Telemetry Charts Section */
+  .telemetry-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) {
+    .telemetry-section { grid-template-columns: 1fr; }
+  }
+  .chart-canvas-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+  }
+  canvas.telemetry-chart {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Calibration & Ground truth tools */
+  .calibration-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 768px) {
+    .calibration-grid { grid-template-columns: 1fr; }
+  }
+  .action-box {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .action-box-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .action-box-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .btn-primary {
+    background: var(--teal);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: var(--radius-btn);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--teal-glow);
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
+  .btn-danger {
+    background: transparent;
+    color: var(--rose);
+    border: 1px solid var(--rose);
+    padding: 8px 14px;
+    border-radius: var(--radius-btn);
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .btn-danger:hover {
+    background: var(--rose-glow);
+  }
+  .btn-secondary {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: var(--radius-btn);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--blue-glow);
+    transition: var(--transition);
+  }
+  .btn-secondary:hover {
+    filter: brightness(1.1);
+  }
+
+  .input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .input-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .input-field {
+    width: 80px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: var(--radius-btn);
+    outline: none;
+  }
+  .input-field:focus {
+    border-color: var(--teal);
+  }
+
+  /* Educational / Viva accordion */
+  details.viva-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    padding: 16px 20px;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+  }
+  details.viva-card summary {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    list-style: none;
+  }
+  details.viva-card summary::-webkit-details-marker { display: none; }
+  details.viva-card summary::after {
+    content: '▼';
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+  }
+  details.viva-card[open] summary::after {
+    transform: rotate(180deg);
+  }
+  .viva-content {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 14px;
+  }
+  .formula-card {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .formula-card h4 {
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .formula-code {
+    background: rgba(0,0,0,0.06);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: block;
+    margin: 6px 0;
+  }
+  [data-theme="dark"] .formula-code {
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* Toast notification */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--text-primary);
+    color: var(--bg-page);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: var(--card-shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+  }
+  #toast.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-left">
+    <div class="header-brand">
+      <div class="logo-icon" title="Pollutant Source Triangulation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 22 20 2 20 12 2"></polygon>
+          <circle cx="12" cy="14" r="2" fill="currentColor"></circle>
+        </svg>
+      </div>
+      <div class="header-title">
+        <div class="title-row">
+          <h1>Pollutant Source Triangulation</h1>
+          <span class="brand-badge">IoT Core</span>
+        </div>
+        <div class="tagline">Multisensor Concentration Trilateration &amp; ML</div>
+      </div>
+    </div>
+
+    <div class="nav-separator"></div>
+
+    <div id="status-pill" class="status-badge offline" title="System Detection & Hardware Connectivity">
+      <span class="pulse-dot-wrapper">
+        <span class="pulse-ring"></span>
+        <span class="pulse-dot"></span>
+      </span>
+      <span id="status-text">Connecting to telemetry server...</span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <!-- Latency / Update Rate Pill -->
+    <div id="ping-pill" class="ping-badge" title="Network Latency and Refresh Frequency">
+      <span class="ping-indicator"></span>
+      <span id="ping-text">250ms ping • 4Hz</span>
+    </div>
+
+    <div class="nav-separator"></div>
+
+    <!-- Speed / Smoothing Mode Selector -->
+    <div class="speed-control" title="Response Delay / Smoothing Filter Window">
+      <button class="speed-btn" data-sec="0.8" onclick="setSpeedMode(0.8)">
+        <span>⚡</span><span class="speed-label">Turbo</span><span class="speed-sub">0.8s</span>
+      </button>
+      <button class="speed-btn active" data-sec="1.5" onclick="setSpeedMode(1.5)">
+        <span>⚖️</span><span class="speed-label">Balanced</span><span class="speed-sub">1.5s</span>
+      </button>
+      <button class="speed-btn" data-sec="3.0" onclick="setSpeedMode(3.0)">
+        <span>🛡️</span><span class="speed-label">Filtered</span><span class="speed-sub">3s</span>
+      </button>
+    </div>
+
+    <div class="nav-separator"></div>
+
+    <!-- Quick Action Controls -->
+    <div class="action-btn-group">
+      <!-- Audio Alert Mute Toggle -->
+      <button class="icon-btn" id="sound-btn" onclick="toggleAudio()" title="Sound Alert Notification">
+        <span id="sound-icon">🔔</span> <span id="sound-label">Alerts On</span>
+      </button>
+
+      <!-- Trail Toggle -->
+      <button class="icon-btn active" id="trail-btn" onclick="toggleTrail()" title="Toggle Plume Position History Trail">
+        <span>📍</span> <span id="trail-label">Trail On</span>
+      </button>
+
+      <!-- Dark Mode Toggle Switch -->
+      <button class="icon-btn theme-toggle-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle Dark / Light Mode" aria-label="Toggle theme">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-label" class="sr-only">Dark</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- USER-FRIENDLY EXECUTIVE / NON-TECHNICAL SUMMARY -->
+  <section class="overview-banner" id="overview-banner">
+    <!-- Row 1: Severity Badge + Headline -->
+    <div>
+      <div class="banner-status-badge" id="banner-badge" style="color:var(--emerald);">
+        <span id="banner-icon">✅</span> <span id="banner-badge-text">NORMAL AIR QUALITY</span>
+      </div>
+      <div class="banner-heading" id="banner-heading">Clean Baseline Environment</div>
+      <div class="banner-desc" id="banner-desc">
+        All 3 sensor nodes report clean baseline air. No active gas plume detected in the monitoring field.
+      </div>
+    </div>
+
+    <!-- Row 2: Threat Level Gauge + Gas Info + Metrics -->
+    <div class="overview-detail-grid">
+      <!-- Threat Level Gauge -->
+      <div id="threat-gauge" class="banner-box" style="text-align:center;">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:6px;">Threat Level</div>
+        <div id="threat-level-icon" style="font-size:36px; line-height:1;">✅</div>
+        <div id="threat-level-label" style="font-size:14px; font-weight:800; margin-top:4px; color:var(--emerald);">Safe</div>
+        <!-- Severity bar -->
+        <div style="display:flex; gap:3px; margin-top:8px; justify-content:center;">
+          <div id="sev-bar-0" style="width:28px; height:6px; border-radius:3px; background:var(--emerald); opacity:1;"></div>
+          <div id="sev-bar-1" style="width:28px; height:6px; border-radius:3px; background:var(--border-color); opacity:0.3;"></div>
+          <div id="sev-bar-2" style="width:28px; height:6px; border-radius:3px; background:var(--border-color); opacity:0.3;"></div>
+          <div id="sev-bar-3" style="width:28px; height:6px; border-radius:3px; background:var(--border-color); opacity:0.3;"></div>
+          <div id="sev-bar-4" style="width:28px; height:6px; border-radius:3px; background:var(--border-color); opacity:0.3;"></div>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+          Peak: <span id="threat-peak" style="font-family:var(--font-mono); font-weight:600;">0</span> mV
+        </div>
+      </div>
+
+      <!-- Gas Type / What's Detected Box -->
+      <div id="gas-info-box" class="banner-box">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:8px;">🔬 What's Being Detected</div>
+        <div id="gas-primary" style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">No pollutant detected</div>
+        <div id="gas-list" style="font-size:12px; color:var(--text-secondary); line-height:1.6;">
+          MQ-135 sensor monitors: NH₃, NOx, CO₂, smoke, alcohol, benzene vapours.
+        </div>
+      </div>
+
+      <!-- Recommended Action Box -->
+      <div id="action-box-banner" class="banner-box">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:8px;">🛡️ Recommended Action</div>
+        <div id="action-text" style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
+          No action required. System is monitoring normally.
+        </div>
+      </div>
+
+      <!-- Quick Metrics (Coordinates, Dominant Node, Method) -->
+      <div class="banner-quick-metrics">
+        <div class="q-metric-item">
+          <div class="q-label">Source Location</div>
+          <div class="q-val" id="banner-coords">None</div>
+          <div class="q-sub" id="banner-coords-sub">Sensor field clear</div>
+        </div>
+        <div class="q-metric-item">
+          <div class="q-label">Dominant Node</div>
+          <div class="q-val" id="banner-dom-node">-</div>
+          <div class="q-sub" id="banner-dom-sig">0.0 mV signal</div>
+        </div>
+        <div class="q-metric-item">
+          <div class="q-label">Fusion Method</div>
+          <div class="q-val" id="banner-fusion-method">-</div>
+          <div class="q-sub" id="banner-path-loss">n = 2.0</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- DASHBOARD MAIN 2-COLUMN VIEW -->
+  <div class="dashboard-grid">
+    <!-- LEFT: 2D Spatial Localization Map -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">
+            <span>🗺️</span> Real-Time 2D Sensor Field Map
+          </div>
+          <div class="card-subtitle">Grid coordinate system in metres (Node A origin at 0, 0)</div>
+        </div>
+        <div class="map-overlay-controls">
+          <button class="map-mini-btn active" id="btn-circles" onclick="toggleDistanceCircles()">Circles: ON</button>
+          <button class="map-mini-btn" onclick="clearTrail()">Clear Trail</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrapper" id="canvas-container">
+        <canvas id="map" width="640" height="500"></canvas>
+        <div class="map-tooltip" id="map-tooltip"></div>
+      </div>
+
+      <!-- Map Legend -->
+      <div class="map-legend">
+        <div class="legend-item"><span class="legend-symbol circle" style="background:var(--canvas-node)"></span> Node (A, B, C)</div>
+        <div class="legend-item"><span class="legend-symbol" style="background:var(--blue)"></span> Centroid (Baseline)</div>
+        <div class="legend-item"><span class="legend-symbol" style="background:var(--amber)"></span> Trilateration (Circles)</div>
+        <div class="legend-item"><span class="legend-symbol" style="background:var(--purple)"></span> AI Random Forest</div>
+        <div class="legend-item"><span class="legend-symbol ring"></span> Final Fused Target</div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Telemetry, Node Cards, Estimation Table -->
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <!-- Sensor Node Telemetry Cards -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title"><span>📡</span> Sensor Nodes Status</div>
+          <div class="card-subtitle" id="nodes-health">3/3 Nodes Reporting</div>
+        </div>
+        <div class="nodes-grid" id="nodes-container">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Multi-Model Estimation Comparison -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title"><span>📐</span> Multi-Model Coordinate Estimates</div>
+          <div class="card-subtitle">Centroid vs. Distance Trilateration vs. Random Forest</div>
+        </div>
+        <div class="table-responsive">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>X (m)</th>
+                <th>Y (m)</th>
+                <th>GPS (Lat, Lng)</th>
+              </tr>
+            </thead>
+            <tbody id="est-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- DETAILED TELEMETRY & CHARTS SECTION -->
+  <div class="telemetry-section">
+    <!-- Chart 1: Real-Time Signal mV -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><span>📈</span> Sensor Signal Rise Above Baseline (mV)</div>
+          <div class="card-subtitle">Real-time concentration wave per node (MQ-135)</div>
+        </div>
+        <div style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted);" id="chart-sig-legend">
+          <span style="color:var(--emerald);">■ Node A</span> &nbsp;
+          <span style="color:var(--amber);">■ Node B</span> &nbsp;
+          <span style="color:var(--purple);">■ Node C</span>
+        </div>
+      </div>
+      <div class="chart-canvas-container">
+        <canvas id="sigChart" class="telemetry-chart"></canvas>
+      </div>
+    </section>
+
+    <!-- Chart 2: Environmental Trends -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><span>🌡️</span> Environmental Temperature & Humidity</div>
+          <div class="card-subtitle">Ambient compensation tracking (DHT11)</div>
+        </div>
+        <div style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted);">
+          <span style="color:var(--rose);">■ Temp (°C)</span> &nbsp;
+          <span style="color:var(--blue);">■ Humidity (%)</span>
+        </div>
+      </div>
+      <div class="chart-canvas-container">
+        <canvas id="envChart" class="telemetry-chart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <!-- CALIBRATION & GROUND TRUTH STATION -->
+  <section class="card">
+    <div class="card-header">
+      <div class="card-title"><span>⚙️</span> Calibration & Machine Learning Data Collection</div>
+      <div class="card-subtitle">Calibrate zero-voltage baseline and train custom room path-loss models</div>
+    </div>
+
+    <div class="calibration-grid">
+      <!-- Clean Air Calibration Box -->
+      <div class="action-box">
+        <div>
+          <div class="action-box-title">1. Clean-Air Zero Baseline</div>
+          <div class="action-box-desc">
+            Let ESP32 nodes warm up for 10+ minutes in clean air. Click to average the last 10 seconds of raw sensor voltage as zero.
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button class="btn-primary" onclick="setBaseline()">
+            <span>🎯</span> Calibrate Baseline (Clean Air)
+          </button>
+          <button class="btn-danger" onclick="clearBaseline()">
+            Reset Baseline
+          </button>
+        </div>
+      </div>
+
+      <!-- Real Training Sample Logger Box -->
+      <div class="action-box">
+        <div>
+          <div class="action-box-title">2. Log Ground Truth Spot (Real AI Training)</div>
+          <div class="action-box-desc">
+            Place test source (e.g. incense stick / sanitizer) at a known spot. Type (X, Y) coordinates or click directly on the 2D map!
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div class="input-group">
+            <span class="input-label">X (m):</span>
+            <input class="input-field" id="lx" type="number" step="0.1" value="1.0">
+          </div>
+          <div class="input-group">
+            <span class="input-label">Y (m):</span>
+            <input class="input-field" id="ly" type="number" step="0.1" value="1.0">
+          </div>
+          <button class="btn-secondary" onclick="logSample()">
+            <span>📝</span> Log Sample
+          </button>
+          <span style="font-size:12px; font-weight:600; color:var(--text-muted);" id="sample-count-badge">0 logged</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDUCATIONAL / VIVA REPORT HELPER SECTION -->
+  <details class="viva-card">
+    <summary>
+      <span>📚 Mathematical Formulations & Viva Reference Guide</span>
+    </summary>
+    <div class="viva-content">
+      <div class="formula-card">
+        <h4>1. Weighted Centroid (Spatial Baseline)</h4>
+        <div class="formula-code">x = Σ(s_i * x_i) / Σ(s_i),  y = Σ(s_i * y_i) / Σ(s_i)</div>
+        <p>Simple fast baseline. Biased toward the center of the polygon when noise is high, but provides robust initial guess.</p>
+      </div>
+      <div class="formula-card">
+        <h4>2. Concentration-Based Trilateration</h4>
+        <div class="formula-code">ln(s_i) = ln(A) - (n/2) * ln(d_i² + r_0²)</div>
+        <p>Solves non-linear least squares for (x, y, ln A). The unknown source strength A is estimated simultaneously without per-node calibration.</p>
+      </div>
+      <div class="formula-card">
+        <h4>3. Machine Learning (Random Forest)</h4>
+        <div class="formula-code">Feature Vector = [s_A/S_tot, s_B/S_tot, s_C/S_tot, ln(1 + S_tot)]</div>
+        <p>Scale-free normalized input features handle variable source release rates and overcome indoor wall reflection distortions.</p>
+      </div>
+    </div>
+  </details>
+</main>
+
+<div id="toast">Notification</div>
+
+<script>
+/* ----------------------------------------------------
+   STATE & CONFIGURATION
+---------------------------------------------------- */
+let state = null;
+let trail = [];
+let showTrail = true;
+let showDistanceCircles = true;
+let audioAlerts = true;
+let lastAlertTimestamp = 0;
+let isDark = localStorage.getItem('theme') === 'dark' ||
+             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+// Audio Context for subtle alerts
+let audioCtx = null;
+
+// Telemetry History Buffer (sliding window)
+const HISTORY_LIMIT = 50;
+let historyBuffer = {
+  times: [],
+  nodes: { A: [], B: [], C: [] },
+  env: { temp: [], hum: [] }
+};
+
+// Canvas references
+const mapCanvas = document.getElementById('map');
+const mapCtx = mapCanvas.getContext('2d');
+const sigCanvas = document.getElementById('sigChart');
+const sigCtx = sigCanvas.getContext('2d');
+const envCanvas = document.getElementById('envChart');
+const envCtx = envCanvas.getContext('2d');
+
+/* ----------------------------------------------------
+   THEME SETUP
+---------------------------------------------------- */
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.getElementById('theme-icon').textContent = isDark ? '☀️' : '🌙';
+  document.getElementById('theme-label').textContent = isDark ? 'Light' : 'Dark';
+  if (state) drawMap(state);
+}
+function toggleTheme() {
+  isDark = !isDark;
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  applyTheme();
+}
+applyTheme();
+
+function toggleTrail() {
+  showTrail = !showTrail;
+  document.getElementById('trail-btn').classList.toggle('active', showTrail);
+  document.getElementById('trail-label').textContent = showTrail ? 'Trail On' : 'Trail Off';
+  if (state) drawMap(state);
+}
+
+function clearTrail() {
+  trail = [];
+  if (state) drawMap(state);
+  showToast('Plume trajectory trail cleared');
+}
+
+function toggleDistanceCircles() {
+  showDistanceCircles = !showDistanceCircles;
+  const btn = document.getElementById('btn-circles');
+  btn.classList.toggle('active', showDistanceCircles);
+  btn.textContent = showDistanceCircles ? 'Circles: ON' : 'Circles: OFF';
+  if (state) drawMap(state);
+}
+
+function toggleAudio() {
+  audioAlerts = !audioAlerts;
+  document.getElementById('sound-icon').textContent = audioAlerts ? '🔔' : '🔕';
+  document.getElementById('sound-label').textContent = audioAlerts ? 'Alerts On' : 'Muted';
+  const soundBtn = document.getElementById('sound-btn');
+  if (soundBtn) soundBtn.classList.toggle('muted', !audioAlerts);
+  showToast(audioAlerts ? 'Audio alert chime enabled' : 'Audio alerts muted');
+}
+
+function playBeep(frequency = 650, duration = 0.15) {
+  if (!audioAlerts) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ----------------------------------------------------
+   ULTRA-LOW LATENCY POLLING (250ms FAST LOOP)
+---------------------------------------------------- */
+let pollDelayMs = 250;
+let isPolling = false;
+let latencyMs = 0;
+
+async function poll() {
+  if (isPolling) return;
+  isPolling = true;
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/api/state');
+    latencyMs = Math.round(performance.now() - t0);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    state = data;
+    render(data);
+  } catch (err) {
+    const stPill = document.getElementById('status-pill');
+    stPill.className = 'status-badge offline';
+    document.getElementById('status-text').textContent = 'Server Offline (localhost:5000)';
+  } finally {
+    isPolling = false;
+    setTimeout(poll, pollDelayMs);
+  }
+}
+poll();
+
+async function setSpeedMode(seconds) {
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smooth_window_seconds: parseFloat(seconds) })
+    });
+    if (r.ok) {
+      showToast(`Smoothing window set to ${seconds}s (Low Delay Mode)`);
+      document.querySelectorAll('.speed-btn').forEach(b => {
+        b.classList.toggle('active', parseFloat(b.dataset.sec) === parseFloat(seconds));
+      });
+    }
+  } catch(e) {
+    showToast('Failed to update speed config');
+  }
+}
+
+/* ----------------------------------------------------
+   RENDER UI
+---------------------------------------------------- */
+function render(s) {
+  // Update latency and FPS display
+  const pingEl = document.getElementById('ping-text');
+  if (pingEl) {
+    const fps = (1000 / pollDelayMs).toFixed(0);
+    pingEl.textContent = `${latencyMs}ms ping • ${fps}Hz`;
+  }
+
+  // Update speed button active states if reported by server
+  if (s.smooth_window_seconds) {
+    document.querySelectorAll('.speed-btn').forEach(b => {
+      b.classList.toggle('active', Math.abs(parseFloat(b.dataset.sec) - s.smooth_window_seconds) < 0.2);
+    });
+  }
+
+  // Update header status pill
+  const pill = document.getElementById('status-pill');
+  const txt = document.getElementById('status-text');
+
+  const nodesList = Object.entries(s.nodes || {});
+  const onlineCount = nodesList.filter(([k, n]) => n.online).length;
+  const hasSource = Boolean(s.estimates && s.estimates.final);
+
+  if (hasSource) {
+    pill.className = 'status-badge danger';
+    txt.textContent = `Plume Detected (${s.estimates.final.x}m, ${s.estimates.final.y}m)`;
+    // Alert chime once every 10s if new alert
+    if (Date.now() - lastAlertTimestamp > 10000) {
+      playBeep(750, 0.25);
+      lastAlertTimestamp = Date.now();
+    }
+  } else if (!s.baseline_set) {
+    pill.className = 'status-badge warning';
+    txt.textContent = 'Baseline not set — Warm up & calibrate';
+  } else if (onlineCount > 0) {
+    pill.className = 'status-badge online';
+    txt.textContent = `${onlineCount}/${nodesList.length} Nodes Online • Clean Air`;
+  } else {
+    pill.className = 'status-badge offline';
+    txt.textContent = 'Waiting for ESP32 Nodes...';
+  }
+
+  // Update Non-Technical Banner
+  renderOverviewBanner(s);
+
+  // Update Node Mini Cards
+  renderNodeCards(s);
+
+  // Update Multi-Model Estimates Table
+  renderEstimatesTable(s);
+
+  // Update Sample Count in Logger
+  if (s.samples_count !== undefined) {
+    document.getElementById('sample-count-badge').textContent = `${s.samples_count} logged`;
+  }
+
+  // Record history for telemetry charts
+  pushHistoryPoint(s);
+
+  // Redraw 2D Map & Charts
+  drawMap(s);
+  drawTelemetryCharts();
+}
+
+function renderOverviewBanner(s) {
+  const banner = document.getElementById('overview-banner');
+  const bBadge = document.getElementById('banner-badge');
+  const bIcon = document.getElementById('banner-icon');
+  const bBadgeText = document.getElementById('banner-badge-text');
+  const bHeading = document.getElementById('banner-heading');
+  const bDesc = document.getElementById('banner-desc');
+  const bCoords = document.getElementById('banner-coords');
+  const bCoordsSub = document.getElementById('banner-coords-sub');
+  const bDomNode = document.getElementById('banner-dom-node');
+  const bDomSig = document.getElementById('banner-dom-sig');
+  const bFusion = document.getElementById('banner-fusion-method');
+  const bPathLoss = document.getElementById('banner-path-loss');
+
+  const e = s.estimates || {};
+  const h = e.hazard || {};
+  const nodes = Object.entries(s.nodes || {});
+
+  // Find dominant node
+  let maxSig = -1, maxK = '-';
+  for (const [k, n] of nodes) {
+    if (n.signal !== null && n.signal > maxSig) {
+      maxSig = n.signal;
+      maxK = k;
+    }
+  }
+
+  bDomNode.textContent = maxSig > 0 ? `Node ${maxK}` : 'None';
+  bDomSig.textContent = maxSig > 0 ? `${maxSig.toFixed(1)} mV signal` : 'Clean air';
+  bPathLoss.textContent = `Path-loss n = ${s.exponent || 2.0}`;
+
+  // ---- Update Threat Gauge ----
+  const severity = h.severity ?? 0;
+  const sevColors = ['#059669', '#eab308', '#f97316', '#ef4444', '#dc2626'];
+  const sevLabels = ['Safe', 'Trace', 'Moderate', 'High', 'Critical'];
+  const gaugeColor = h.color || sevColors[0];
+
+  document.getElementById('threat-level-icon').textContent = h.icon || '✅';
+  const threatLabel = document.getElementById('threat-level-label');
+  threatLabel.textContent = h.label || sevLabels[Math.max(0, severity)];
+  threatLabel.style.color = gaugeColor;
+  document.getElementById('threat-peak').textContent = (h.peak_mv ?? 0).toFixed(0);
+
+  // Update severity bar segments
+  for (let i = 0; i <= 4; i++) {
+    const bar = document.getElementById(`sev-bar-${i}`);
+    if (!bar) continue;
+    if (severity >= 0 && i <= severity) {
+      bar.style.background = sevColors[Math.min(i, 4)];
+      bar.style.opacity = '1';
+    } else {
+      bar.style.background = 'var(--border-color)';
+      bar.style.opacity = '0.3';
+    }
+  }
+
+  // ---- Update Gas Info Box ----
+  const gasPrimary = document.getElementById('gas-primary');
+  const gasList = document.getElementById('gas-list');
+  if (h.gas_hint && severity > 0) {
+    gasPrimary.textContent = h.gas_hint;
+    const possibleGases = h.possible_gases || [];
+    if (possibleGases.length > 0) {
+      gasList.innerHTML = '<div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:3px;">POSSIBLE POLLUTANT TYPES:</div>' +
+        possibleGases.map(g => `<div style="padding:2px 0;">• ${g}</div>`).join('');
+    } else {
+      gasList.textContent = `MQ-135 detected elevated gas. Likely: ${h.gas_hint}`;
+    }
+  } else {
+    gasPrimary.textContent = 'No pollutant detected';
+    gasList.textContent = 'MQ-135 sensor monitors: NH₃ (ammonia), NOx, CO₂, smoke, alcohol, benzene vapours. All readings at baseline.';
+  }
+
+  // ---- Update Action Box ----
+  const actionText = document.getElementById('action-text');
+  actionText.textContent = h.action || 'No action required. System is monitoring normally.';
+  // Style action box border based on severity
+  const actionBox = document.getElementById('action-box-banner');
+  if (severity >= 3) {
+    actionBox.style.borderColor = gaugeColor;
+    actionBox.style.background = `${gaugeColor}15`;
+    actionText.style.color = gaugeColor;
+    actionText.style.fontWeight = '700';
+  } else {
+    actionBox.style.borderColor = 'var(--border-color)';
+    actionBox.style.background = 'var(--bg-card-subtle)';
+    actionText.style.color = 'var(--text-secondary)';
+    actionText.style.fontWeight = '400';
+  }
+
+  // ---- Update Banner Chrome (left bar color, badge, headline) ----
+  bIcon.textContent = h.icon || '✅';
+
+  if (severity >= 3) {
+    banner.className = 'overview-banner status-hazard';
+    bBadge.style.color = 'var(--rose)';
+    bBadgeText.textContent = h.label ? h.label.toUpperCase() : 'HIGH ALERT';
+    bHeading.textContent = h.headline || `Strong Gas Source Detected near Node ${maxK}`;
+    bDesc.textContent = h.detail || 'High gas concentration detected. Take immediate action.';
+  } else if (severity === 2) {
+    banner.className = 'overview-banner status-hazard';
+    bBadge.style.color = '#f97316';
+    bBadgeText.textContent = 'MODERATE POLLUTION';
+    bHeading.textContent = h.headline || `Active Gas Source — Moderate Level`;
+    bDesc.textContent = h.detail || 'Significant gas concentration detected.';
+  } else if (severity === 1) {
+    banner.className = 'overview-banner status-warn';
+    bBadge.style.color = '#eab308';
+    bBadgeText.textContent = 'TRACE GAS DETECTED';
+    bHeading.textContent = h.headline || 'Faint Gas Trace Detected';
+    bDesc.textContent = h.detail || 'A weak signal has been picked up. Monitor the trend.';
+  } else if (!s.baseline_set) {
+    banner.className = 'overview-banner status-warn';
+    bBadge.style.color = 'var(--amber)';
+    bBadgeText.textContent = 'BASELINE REQUIRED';
+    bHeading.textContent = h.headline || 'Calibration Incomplete';
+    bDesc.textContent = h.detail || 'Clean-air zero baseline has not been captured yet. Please ensure all 3 sensors are in fresh air and click "Set Clean Baseline".';
+  } else {
+    banner.className = 'overview-banner';
+    bBadge.style.color = 'var(--emerald)';
+    bBadgeText.textContent = 'NORMAL AIR QUALITY';
+    bHeading.textContent = h.headline || 'Clean Baseline Environment';
+    bDesc.textContent = h.detail || 'All nodes reporting nominal levels. Signal rise is below detection threshold. No plume located.';
+  }
+
+  // ---- Update Coordinate Metrics ----
+  if (e.final) {
+    bCoords.textContent = `(${e.final.x}m, ${e.final.y}m)`;
+    bCoordsSub.textContent = `GPS: ${e.final.lat}, ${e.final.lng}`;
+    bFusion.textContent = e.method || 'Fused';
+
+    // Store in breadcrumb trail
+    if (showTrail) {
+      trail.push({ x: e.final.x, y: e.final.y, t: Date.now() });
+      if (trail.length > 25) trail.shift();
+    }
+  } else {
+    bCoords.textContent = severity > 0 ? 'Calculating...' : 'Clean Field';
+    bCoordsSub.textContent = severity > 0 ? 'Below localisation threshold' : 'No active source';
+    bFusion.textContent = severity > 0 ? 'Monitoring' : 'Idle';
+  }
+}
+
+
+function renderNodeCards(s) {
+  const container = document.getElementById('nodes-container');
+  container.innerHTML = '';
+  const entries = Object.entries(s.nodes || {});
+  let onlineCount = 0;
+
+  entries.forEach(([id, n]) => {
+    if (n.online) onlineCount++;
+    const statusColor = n.online ? 'var(--emerald)' : 'var(--rose)';
+    const statusGlow = n.online ? 'var(--emerald-glow)' : 'var(--rose-glow)';
+    const sigVal = n.signal !== null ? `${n.signal.toFixed(1)}` : '-';
+    const rawMv = n.mv !== null ? `${n.mv.toFixed(0)} mV` : '-';
+    const tempHum = (n.temp !== null && n.hum !== null) ? `${n.temp.toFixed(1)}°C / ${n.hum.toFixed(0)}%` : '-';
+    const age = n.age !== null ? `${n.age}s ago` : 'never';
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="node-card">
+        <div class="node-card-top">
+          <div class="node-badge">
+            <span class="pulse-dot" style="background:${statusColor}; box-shadow:0 0 6px ${statusGlow}"></span>
+            Node ${id}
+          </div>
+          <div class="node-pos">(${n.x}, ${n.y})m</div>
+        </div>
+        <div>
+          <span class="node-signal-val">${sigVal}</span>
+          <span class="node-signal-unit">mV rise</span>
+        </div>
+        <div class="node-meta">
+          <span>Raw: ${rawMv}</span>
+          <span>${tempHum}</span>
+        </div>
+        <div class="node-meta" style="margin-top:2px; font-size:10px; color:var(--text-muted);">
+          <span>${n.online ? 'Online' : 'Offline'}</span>
+          <span>${age}</span>
+        </div>
+      </div>
+    `);
+  });
+
+  document.getElementById('nodes-health').textContent = `${onlineCount}/${entries.length} Nodes Active`;
+}
+
+function renderEstimatesTable(s) {
+  const tbody = document.getElementById('est-tbody');
+  tbody.innerHTML = '';
+  const e = s.estimates || {};
+
+  const models = [
+    { name: 'Weighted Centroid', point: e.centroid, color: 'var(--blue)', icon: '■' },
+    { name: 'Concentration Trilateration', point: e.trilateration, color: 'var(--amber)', icon: '◆' },
+    { name: 'AI (Random Forest)', point: e.ai, color: 'var(--purple)', icon: '▲' },
+    { name: 'Final Fused Estimate', point: e.final, color: 'var(--rose)', icon: '●', isFinal: true }
+  ];
+
+  models.forEach(m => {
+    const isFin = m.isFinal;
+    if (m.point) {
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr class="${isFin ? 'highlight-final' : ''}">
+          <td style="font-weight:600; display:flex; align-items:center; gap:6px;">
+            <span style="color:${m.color}">${m.icon}</span> ${m.name}
+          </td>
+          <td><span class="coord-pill">${m.point.x.toFixed(2)}</span></td>
+          <td><span class="coord-pill">${m.point.y.toFixed(2)}</span></td>
+          <td style="font-family:var(--font-mono); font-size:11px;">${m.point.lat}, ${m.point.lng}</td>
+        </tr>
+      `);
+    } else {
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td style="color:var(--text-muted);"><span style="color:${m.color}">${m.icon}</span> ${m.name}</td>
+          <td colspan="3" style="color:var(--text-muted); font-style:italic;">No estimate computed</td>
+        </tr>
+      `);
+    }
+  });
+}
+
+/* ----------------------------------------------------
+   2D MAP CANVAS RENDERING
+---------------------------------------------------- */
+function getBoundingBox(nodes) {
+  const xs = Object.values(nodes).map(n => n.x);
+  const ys = Object.values(nodes).map(n => n.y);
+  const pad = 1.6;
+  return {
+    x0: Math.min(...xs, 0) - pad,
+    x1: Math.max(...xs, 4) + pad,
+    y0: Math.min(...ys, 0) - pad,
+    y1: Math.max(...ys, 3.5) + pad
+  };
+}
+
+let mapTransform = null;
+
+function drawMap(s) {
+  if (!mapCanvas) return;
+  const W = mapCanvas.width, H = mapCanvas.height;
+  mapCtx.clearRect(0, 0, W, H);
+
+  const b = getBoundingBox(s.nodes || {});
+  const sc = Math.min((W - 60) / (b.x1 - b.x0), (H - 60) / (b.y1 - b.y0));
+  const ox = (W - sc * (b.x1 - b.x0)) / 2;
+  const oy = (H - sc * (b.y1 - b.y0)) / 2;
+
+  const X = x => ox + (x - b.x0) * sc;
+  const Y = y => H - (oy + (y - b.y0) * sc);
+  mapTransform = { X, Y, invX: px => (px - ox) / sc + b.x0, invY: py => b.y0 + (H - oy - py) / sc };
+
+  // Styles based on theme
+  const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+  const gridText = isDark ? '#475569' : '#94a3b8';
+  const nodeFill = isDark ? '#f8fafc' : '#0f172a';
+  const triColor = isDark ? '#334155' : '#cbd5e1';
+
+  // Draw 1-metre Grid
+  mapCtx.strokeStyle = gridColor;
+  mapCtx.lineWidth = 1;
+  mapCtx.fillStyle = gridText;
+  mapCtx.font = '10px JetBrains Mono, monospace';
+
+  for (let x = Math.ceil(b.x0); x <= b.x1; x++) {
+    const px = X(x);
+    mapCtx.beginPath();
+    mapCtx.moveTo(px, 0);
+    mapCtx.lineTo(px, H);
+    mapCtx.stroke();
+    mapCtx.fillText(x + 'm', px + 3, H - 6);
+  }
+  for (let y = Math.ceil(b.y0); y <= b.y1; y++) {
+    const py = Y(y);
+    mapCtx.beginPath();
+    mapCtx.moveTo(0, py);
+    mapCtx.lineTo(W, py);
+    mapCtx.stroke();
+    mapCtx.fillText(y + 'm', 6, py - 3);
+  }
+
+  // Draw Sensor Triangle Boundary
+  const ns = Object.values(s.nodes || {});
+  if (ns.length >= 3) {
+    mapCtx.strokeStyle = triColor;
+    mapCtx.setLineDash([6, 6]);
+    mapCtx.lineWidth = 1.5;
+    mapCtx.beginPath();
+    ns.forEach((n, idx) => idx ? mapCtx.lineTo(X(n.x), Y(n.y)) : mapCtx.moveTo(X(n.x), Y(n.y)));
+    mapCtx.closePath();
+    mapCtx.stroke();
+    mapCtx.setLineDash([]);
+  }
+
+  // Trilateration Distance Circles (when active)
+  const e = s.estimates || {};
+  if (showDistanceCircles && e.final) {
+    const fx = e.final.x, fy = e.final.y;
+    for (const [id, n] of Object.entries(s.nodes || {})) {
+      const dist = Math.sqrt((fx - n.x)**2 + (fy - n.y)**2);
+      const rPx = dist * sc;
+      mapCtx.strokeStyle = 'rgba(217, 119, 6, 0.28)';
+      mapCtx.lineWidth = 1.5;
+      mapCtx.setLineDash([4, 4]);
+      mapCtx.beginPath();
+      mapCtx.arc(X(n.x), Y(n.y), rPx, 0, Math.PI * 2);
+      mapCtx.stroke();
+      mapCtx.setLineDash([]);
+    }
+  }
+
+  // Historical Trajectory Trail
+  if (showTrail && trail.length > 1) {
+    mapCtx.lineWidth = 2.5;
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = (i / trail.length) * 0.7;
+      mapCtx.strokeStyle = `rgba(225, 29, 72, ${alpha})`;
+      mapCtx.beginPath();
+      mapCtx.moveTo(X(trail[i-1].x), Y(trail[i-1].y));
+      mapCtx.lineTo(X(trail[i].x), Y(trail[i].y));
+      mapCtx.stroke();
+    }
+  }
+
+  // Draw Nodes with Signal Heat Halos
+  const maxSig = Math.max(1, ...ns.map(n => n.signal || 0));
+  for (const [id, n] of Object.entries(s.nodes || {})) {
+    const sig = n.signal || 0;
+    const nx = X(n.x), ny = Y(n.y);
+
+    // Heat glow halo
+    if (sig > 0) {
+      const haloR = 14 + 36 * Math.min(sig / maxSig, 1);
+      const radGrad = mapCtx.createRadialGradient(nx, ny, 4, nx, ny, haloR);
+      radGrad.addColorStop(0, 'rgba(244, 63, 94, 0.45)');
+      radGrad.addColorStop(1, 'rgba(244, 63, 94, 0)');
+      mapCtx.fillStyle = radGrad;
+      mapCtx.beginPath();
+      mapCtx.arc(nx, ny, haloR, 0, Math.PI * 2);
+      mapCtx.fill();
+    }
+
+    // Node body
+    mapCtx.fillStyle = n.online ? nodeFill : '#64748b';
+    mapCtx.beginPath();
+    mapCtx.arc(nx, ny, 10, 0, Math.PI * 2);
+    mapCtx.fill();
+
+    // Node letter
+    mapCtx.fillStyle = isDark ? '#0f172a' : '#ffffff';
+    mapCtx.font = 'bold 11px sans-serif';
+    mapCtx.textAlign = 'center';
+    mapCtx.textBaseline = 'middle';
+    mapCtx.fillText(id, nx, ny);
+
+    // Node Signal label underneath
+    mapCtx.fillStyle = isDark ? '#94a3b8' : '#475569';
+    mapCtx.font = '10px JetBrains Mono, monospace';
+    const label = (n.signal !== null ? `${n.signal.toFixed(0)}mV` : '-');
+    mapCtx.fillText(label, nx, ny + 20);
+  }
+  mapCtx.textAlign = 'left';
+  mapCtx.textBaseline = 'alphabetic';
+
+  // Draw Model Estimates (Markers)
+  const drawMarker = (p, color, shape) => {
+    if (!p) return;
+    const px = X(p.x), py = Y(p.y);
+    mapCtx.fillStyle = color;
+    mapCtx.strokeStyle = color;
+    mapCtx.lineWidth = 2;
+
+    if (shape === 'sq') { // Centroid
+      mapCtx.fillRect(px - 6, py - 6, 12, 12);
+    } else if (shape === 'dia') { // Trilateration
+      mapCtx.beginPath();
+      mapCtx.moveTo(px, py - 8);
+      mapCtx.lineTo(px + 8, py);
+      mapCtx.lineTo(px, py + 8);
+      mapCtx.lineTo(px - 8, py);
+      mapCtx.closePath();
+      mapCtx.fill();
+    } else if (shape === 'tri') { // AI
+      mapCtx.beginPath();
+      mapCtx.moveTo(px, py - 9);
+      mapCtx.lineTo(px + 8, py + 6);
+      mapCtx.lineTo(px - 8, py + 6);
+      mapCtx.closePath();
+      mapCtx.fill();
+    } else if (shape === 'final') { // Final Fused (animated target ring)
+      // Expanding ripple pulse
+      const now = Date.now();
+      const pulsePhase = (now % 1500) / 1500;
+      const rippleR = 8 + pulsePhase * 24;
+      mapCtx.strokeStyle = `rgba(225, 29, 72, ${1 - pulsePhase})`;
+      mapCtx.lineWidth = 2;
+      mapCtx.beginPath();
+      mapCtx.arc(px, py, rippleR, 0, Math.PI * 2);
+      mapCtx.stroke();
+
+      // Core target
+      mapCtx.strokeStyle = '#e11d48';
+      mapCtx.lineWidth = 2.5;
+      mapCtx.beginPath();
+      mapCtx.arc(px, py, 11, 0, Math.PI * 2);
+      mapCtx.stroke();
+
+      mapCtx.fillStyle = '#e11d48';
+      mapCtx.beginPath();
+      mapCtx.arc(px, py, 4, 0, Math.PI * 2);
+      mapCtx.fill();
+
+      // Coordinate text tag
+      mapCtx.fillStyle = '#e11d48';
+      mapCtx.font = 'bold 10px JetBrains Mono, monospace';
+      mapCtx.fillText(`TARGET (${p.x}, ${p.y})`, px + 15, py - 6);
+    }
+  };
+
+  drawMarker(e.centroid, '#2563eb', 'sq');
+  drawMarker(e.trilateration, '#d97706', 'dia');
+  drawMarker(e.ai, '#7c3aed', 'tri');
+  drawMarker(e.final, '#e11d48', 'final');
+}
+
+/* Map Click-to-calibrate & Hover Tooltips */
+mapCanvas.addEventListener('click', (ev) => {
+  if (!mapTransform) return;
+  const rect = mapCanvas.getBoundingClientRect();
+  const scaleX = mapCanvas.width / rect.width;
+  const scaleY = mapCanvas.height / rect.height;
+  const px = (ev.clientX - rect.left) * scaleX;
+  const py = (ev.clientY - rect.top) * scaleY;
+
+  const realX = Math.round(mapTransform.invX(px) * 10) / 10;
+  const realY = Math.round(mapTransform.invY(py) * 10) / 10;
+
+  document.getElementById('lx').value = realX;
+  document.getElementById('ly').value = realY;
+  showToast(`Calibration point selected: (${realX}m, ${realY}m)`);
+});
+
+mapCanvas.addEventListener('mousemove', (ev) => {
+  if (!mapTransform || !state) return;
+  const rect = mapCanvas.getBoundingClientRect();
+  const scaleX = mapCanvas.width / rect.width;
+  const scaleY = mapCanvas.height / rect.height;
+  const px = (ev.clientX - rect.left) * scaleX;
+  const py = (ev.clientY - rect.top) * scaleY;
+  const realX = mapTransform.invX(px).toFixed(2);
+  const realY = mapTransform.invY(py).toFixed(2);
+
+  const tt = document.getElementById('map-tooltip');
+  tt.style.display = 'block';
+  tt.style.left = (ev.clientX - rect.left + 15) + 'px';
+  tt.style.top = (ev.clientY - rect.top - 20) + 'px';
+  tt.textContent = `X: ${realX}m, Y: ${realY}m (Click to pick)`;
+});
+
+mapCanvas.addEventListener('mouseleave', () => {
+  document.getElementById('map-tooltip').style.display = 'none';
+});
+
+/* ----------------------------------------------------
+   TELEMETRY CHARTS (CANVAS BASED - ZERO DEPENDENCY)
+---------------------------------------------------- */
+function pushHistoryPoint(s) {
+  const now = new Date().toLocaleTimeString([], { hour12: false, minute:'2-digit', second:'2-digit' });
+  historyBuffer.times.push(now);
+
+  const sigA = s.nodes?.A?.signal ?? 0;
+  const sigB = s.nodes?.B?.signal ?? 0;
+  const sigC = s.nodes?.C?.signal ?? 0;
+
+  historyBuffer.nodes.A.push(sigA);
+  historyBuffer.nodes.B.push(sigB);
+  historyBuffer.nodes.C.push(sigC);
+
+  // Avg environmental readings
+  const temps = Object.values(s.nodes || {}).map(n => n.temp).filter(t => t !== null);
+  const hums = Object.values(s.nodes || {}).map(n => n.hum).filter(h => h !== null);
+  const avgTemp = temps.length ? temps.reduce((a,b)=>a+b, 0) / temps.length : 25;
+  const avgHum = hums.length ? hums.reduce((a,b)=>a+b, 0) / hums.length : 50;
+
+  historyBuffer.env.temp.push(avgTemp);
+  historyBuffer.env.hum.push(avgHum);
+
+  if (historyBuffer.times.length > HISTORY_LIMIT) {
+    historyBuffer.times.shift();
+    historyBuffer.nodes.A.shift();
+    historyBuffer.nodes.B.shift();
+    historyBuffer.nodes.C.shift();
+    historyBuffer.env.temp.shift();
+    historyBuffer.env.hum.shift();
+  }
+}
+
+function drawLineChart(cv, ctx, seriesList, yLabel, yMaxOverride = null) {
+  const W = cv.parentElement.clientWidth;
+  const H = cv.parentElement.clientHeight;
+  if (cv.width !== W || cv.height !== H) {
+    cv.width = W;
+    cv.height = H;
+  }
+  ctx.clearRect(0, 0, W, H);
+
+  const padLeft = 42, padRight = 14, padTop = 14, padBottom = 24;
+  const plotW = W - padLeft - padRight;
+  const plotH = H - padTop - padBottom;
+
+  // Find max value across series
+  let allVals = [];
+  seriesList.forEach(s => allVals.push(...s.data));
+  let maxVal = Math.max(...allVals, 10);
+  if (yMaxOverride) maxVal = Math.max(maxVal, yMaxOverride);
+  maxVal = Math.ceil(maxVal * 1.15);
+
+  const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+  const textColor = isDark ? '#64748b' : '#94a3b8';
+
+  // Y-axis gridlines
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.fillStyle = textColor;
+  ctx.font = '10px JetBrains Mono, monospace';
+
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const val = (maxVal / steps) * i;
+    const y = padTop + plotH - (val / maxVal) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(W - padRight, y);
+    ctx.stroke();
+    ctx.fillText(val.toFixed(0), 4, y + 3);
+  }
+
+  // Draw series curves
+  const n = historyBuffer.times.length;
+  if (n < 2) return;
+
+  seriesList.forEach(series => {
+    ctx.strokeStyle = series.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    series.data.forEach((val, idx) => {
+      const x = padLeft + (idx / (n - 1)) * plotW;
+      const y = padTop + plotH - (val / maxVal) * plotH;
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Subtle area gradient fill
+    const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+    grad.addColorStop(0, series.glow);
+    grad.addColorStop(1, 'transparent');
+    ctx.lineTo(padLeft + plotW, padTop + plotH);
+    ctx.lineTo(padLeft, padTop + plotH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+  });
+}
+
+function drawTelemetryCharts() {
+  if (!sigCanvas || !envCanvas) return;
+
+  // Signal Chart
+  drawLineChart(sigCanvas, sigCtx, [
+    { data: historyBuffer.nodes.A, color: '#10b981', glow: 'rgba(16, 185, 129, 0.15)' },
+    { data: historyBuffer.nodes.B, color: '#f59e0b', glow: 'rgba(245, 158, 11, 0.15)' },
+    { data: historyBuffer.nodes.C, color: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.15)' }
+  ], 'mV', 50);
+
+  // Env Chart
+  drawLineChart(envCanvas, envCtx, [
+    { data: historyBuffer.env.temp, color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.15)' },
+    { data: historyBuffer.env.hum, color: '#3b82f6', glow: 'rgba(59, 130, 246, 0.15)' }
+  ], '°C / %', 60);
+}
+
+/* ----------------------------------------------------
+   API ACTIONS (BASELINE, LABEL, RESET)
+---------------------------------------------------- */
+async function setBaseline() {
+  showToast('Saving clean-air baseline...');
+  try {
+    const r = await fetch('/api/baseline', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      showToast('Baseline saved successfully! Clean air calibrated to zero.');
+      poll();
+    } else {
+      showToast('Error: ' + (j.error || 'Failed to set baseline'));
+    }
+  } catch (err) {
+    showToast('Failed to reach server');
+  }
+}
+
+async function clearBaseline() {
+  if (!confirm('Are you sure you want to reset the clean-air baseline?')) return;
+  try {
+    const r = await fetch('/api/baseline/clear', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      showToast('Baseline cleared. Sensors now in uncalibrated mode.');
+      poll();
+    }
+  } catch(e) {
+    showToast('Failed to clear baseline');
+  }
+}
+
+async function logSample() {
+  const x = parseFloat(document.getElementById('lx').value);
+  const y = parseFloat(document.getElementById('ly').value);
+  if (isNaN(x) || isNaN(y)) {
+    showToast('Please enter valid numeric X and Y values');
+    return;
+  }
+  showToast(`Logging sample spot at (${x}, ${y})...`);
+  try {
+    const r = await fetch('/api/label', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x, y })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      showToast(`Sample #${j.samples} logged! Retrain AI with 'python train.py' after 15+ spots.`);
+      document.getElementById('sample-count-badge').textContent = `${j.samples} logged`;
+    } else {
+      showToast('Error: ' + (j.error || 'Check that nodes are online and baseline is set'));
+    }
+  } catch (err) {
+    showToast('Failed to reach server');
+  }
+}
+
+function triggerBaselineFlow() {
+  setBaseline();
+}
+
+// Window resize handler for crisp canvas
+window.addEventListener('resize', () => {
+  if (state) {
+    drawMap(state);
+    drawTelemetryCharts();
+  }
+});
+</script>
+</body>
+</html>
